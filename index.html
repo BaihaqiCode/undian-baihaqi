@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gacha Spin Wheel (Full Screen & History)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        /* === [BLOK INI DIUBAH] === */
+        /* CSS Kustom untuk Tanda Panah (Pointer) */
+        .pointer {
+            width: 0;
+            height: 0;
+            /* Ukuran default (Mobile) */
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #374151; 
+            position: absolute;
+            top: -10px; /* Disesuaikan untuk mobile */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+        }
+
+        /* Ukuran Desktop (sm: 640px dan ke atas) */
+        @media (min-width: 640px) {
+            .pointer {
+                border-left: 40px solid transparent;
+                border-right: 40px solid transparent;
+                border-top: 80px solid #374151; 
+                top: -20px; 
+            }
+        }
+        /* === [AKHIR BLOK PERUBAHAN] === */
+
+
+        /* Transisi Putaran Roda (8 detik) */
+        #wheelCanvas, #prizeWheelCanvas {
+            transition: transform 8s cubic-bezier(0.18, 1, 0.22, 1);
+        }
+
+        /* Keyframes untuk perayaan */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% center; }
+            100% { background-position: 0% center; }
+        }
+
+        /* Kelas utilitas untuk animasi */
+        .animate-pop-in {
+            animation: popIn 0.5s ease-out forwards;
+        }
+
+        .text-shimmer {
+            background: linear-gradient(90deg, #6366F1, #EC4899, #A855F7, #6366F1);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 font-sans min-h-screen">
+
+    <div class="w-full min-h-screen flex flex-col items-center justify-center gap-12 py-12 px-4">
+
+        <div class="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl shadow-xl w-full max-w-5xl mx-auto">
+            
+            <h1 class="text-2xl sm:text-3xl font-bold text-center text-slate-700 mb-6">
+                🎉 Spin Nama 🎉
+            </h1>
+
+            <div class="relative flex justify-center items-center mb-6 w-full max-w-[800px] mx-auto aspect-square">
+                <div class="pointer"></div>
+                <canvas id="wheelCanvas" width="800" height="800" class="w-full h-full"></canvas>
+            </div>
+
+            <div class="mb-6">
+                <label for="nameInput" class="block text-sm font-medium text-gray-700 mb-2">
+                    Masukkan Nama Peserta:
+                </label>
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="nameInput"
+                        class="flex-grow w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Contoh: Budi, Ani, Caca..."
+                    >
+                    <button 
+                        id="addNameBtn"
+                        class="px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold rounded-lg shadow-md hover:from-blue-600 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 transform transition hover:scale-105 active:scale-100"
+                    >
+                        Tambah
+                    </button>
+                </div>
+            </div>
+
+            <button 
+                id="spinBtn"
+                class="w-full py-3 mb-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-lg sm:text-xl font-bold rounded-lg shadow-lg hover:from-green-600 hover:to-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-75 transition duration-200 transform hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                SPIN NAMA!
+            </button>
+
+            <div id="winnerDisplay" class="text-center mb-6 p-4 bg-blue-100 border-2 border-blue-300 rounded-lg hidden">
+                <h2 class="text-lg font-medium text-gray-700">Pemenang Terakhir:</h2>
+                <p id="winnerName" class="text-3xl sm:text-4xl font-bold text-blue-600"></p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold text-slate-600 mb-3">Daftar Peserta:</h2>
+                    <div 
+                        id="nameList" 
+                        class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-80 overflow-y-auto space-y-2"
+                    >
+                        <p class="text-gray-400 text-center italic">Belum ada nama...</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold text-slate-600 mb-3">🏆 Riwayat Pemenang:</h2>
+                    <div 
+                        id="nameWinnerList" 
+                        class="bg-yellow-50 p-4 rounded-lg border border-yellow-200 max-h-80 overflow-y-auto space-y-2"
+                    >
+                        <p class="text-gray-400 text-center italic">Belum ada pemenang...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <button 
+                id="resetNameBtn"
+                class="w-full mt-4 px-5 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white font-semibold rounded-lg shadow-md hover:from-red-600 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-opacity-75 transform transition hover:scale-105 active:scale-100"
+            >
+                Reset Semua Nama & Riwayat
+            </button>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl shadow-xl w-full max-w-5xl mx-auto">
+            
+            <h1 class="text-2xl sm:text-3xl font-bold text-center text-slate-700 mb-6">
+                🎁 Gacha Hadiah 🎁
+            </h1>
+
+            <div class="relative flex justify-center items-center mb-6 w-full max-w-[800px] mx-auto aspect-square">
+                <div class="pointer"></div>
+                <canvas id="prizeWheelCanvas" width="800" height="800" class="w-full h-full"></canvas>
+            </div>
+
+            <div class="mb-6">
+                <label for="prizeInput" class="block text-sm font-medium text-gray-700 mb-2">
+                    Masukkan Nama Hadiah:
+                </label>
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="prizeInput"
+                        class="flex-grow w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Contoh: TV, Kulkas, Motor..."
+                    >
+                    <button 
+                        id="addPrizeBtn"
+                        class="px-5 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold rounded-lg shadow-md hover:from-blue-600 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 transform transition hover:scale-105 active:scale-100"
+                    >
+                        Tambah
+                    </button>
+                </div>
+            </div>
+
+            <button 
+                id="spinPrizeBtn"
+                class="w-full py-3 mb-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-lg sm:text-xl font-bold rounded-lg shadow-lg hover:from-purple-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-opacity-75 transition duration-200 transform hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                SPIN HADIAH!
+            </button>
+
+            <div id="prizeWinnerDisplay" class="text-center mb-6 p-4 bg-green-100 border-2 border-green-300 rounded-lg hidden">
+                <h2 class="text-lg font-medium text-gray-700">Hadiah Terakhir:</h2>
+                <p id="prizeWinnerName" class="text-3xl sm:text-4xl font-bold text-green-600"></p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold text-slate-600 mb-3">Daftar Hadiah:</h2>
+                    <div 
+                        id="prizeList" 
+                        class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-80 overflow-y-auto space-y-2"
+                    >
+                        <p class="text-gray-400 text-center italic">Belum ada hadiah...</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold text-slate-600 mb-3">🛍️ Riwayat Hadiah:</h2>
+                    <div 
+                        id="prizeWinnerList" 
+                        class="bg-yellow-50 p-4 rounded-lg border border-yellow-200 max-h-80 overflow-y-auto space-y-2"
+                    >
+                        <p class="text-gray-400 text-center italic">Belum ada hadiah...</p>
+                    </div>
+                </div>
+            </div>
+
+            <button 
+                id="resetPrizeBtn"
+                class="w-full mt-4 px-5 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white font-semibold rounded-lg shadow-md hover:from-red-600 hover:to-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-opacity-75 transform transition hover:scale-105 active:scale-100"
+            >
+                Reset Semua Hadiah & Riwayat
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            const colors = [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#F7D794', '#F0932B',
+                '#EB4D4B', '#686DE0', '#30336B', '#95afc0', '#A3CB38'
+            ];
+
+            // ===========================================
+            // === LOGIKA UNTUK GACHA NAMA (BAGIAN KIRI) ===
+            // ===========================================
+            function setupGachaNama() {
+                const canvas = document.getElementById('wheelCanvas');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const nameInput = document.getElementById('nameInput');
+                const addNameBtn = document.getElementById('addNameBtn');
+                const spinBtn = document.getElementById('spinBtn');
+                const nameList = document.getElementById('nameList');
+                const winnerDisplay = document.getElementById('winnerDisplay');
+                const winnerNameEl = document.getElementById('winnerName');
+                const resetBtn = document.getElementById('resetNameBtn');
+                const nameWinnerList = document.getElementById('nameWinnerList');
+                
+                let names = [];
+                let winners = []; 
+                let currentRotation = 0; 
+                let isSpinning = false;
+
+                function drawWheel() {
+                    const numSegments = names.length;
+                    const arcSize = (2 * Math.PI) / numSegments;
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const radius = canvas.width / 2 - 10; 
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    
+                    let startAngle = -Math.PI / 2;
+
+                    const baseFontSize = 30; 
+                    const minFontSize = 12;  
+                    const maxFontSize = 28;  
+                    const fontSize = Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
+
+                    if (numSegments === 0) {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#f3f4f6'; 
+                        ctx.fill();
+                        ctx.strokeStyle = '#d1d5db'; 
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.fillStyle = '#6b7280'; 
+                        ctx.font = 'bold 40px Arial, sans-serif'; 
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('Tambahkan Nama', 0, 0);
+                        ctx.restore();
+                        return;
+                    }
+
+                    for (let i = 0; i < numSegments; i++) {
+                        const endAngle = startAngle + arcSize;
+                        ctx.beginPath();
+                        ctx.fillStyle = colors[i % colors.length];
+                        ctx.moveTo(0, 0);
+                        ctx.arc(0, 0, radius, startAngle, endAngle);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+
+                        const textAngle = startAngle + arcSize / 2;
+                        ctx.save();
+                        ctx.fillStyle = '#111827';
+                        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                        
+                        ctx.textAlign = 'center'; 
+                        ctx.textBaseline = 'middle';
+                        ctx.rotate(textAngle);
+
+                        let displayName = names[i];
+                        const maxTextWidth = radius * 0.8; 
+                        
+                        if (ctx.measureText(displayName).width > maxTextWidth) {
+                            while (displayName.length > 0 && ctx.measureText(displayName + "...").width > maxTextWidth) {
+                                displayName = displayName.substring(0, displayName.length - 1);
+                            }
+                            displayName += "...";
+                        }
+
+                        const centerRadius = (radius * 0.1) + (maxTextWidth / 2);
+                        
+                        ctx.fillText(displayName, centerRadius, 0);
+
+                        ctx.restore();
+                        startAngle = endAngle;
+                    }
+                    ctx.restore();
+                }
+
+                function updateNameList() {
+                    nameList.innerHTML = ''; 
+                    if (names.length === 0) {
+                        nameList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada nama...</p>';
+                        return;
+                    }
+                    names.forEach((name, index) => {
+                        const nameEl = document.createElement('div');
+                        nameEl.className = 'flex justify-between items-center bg-white p-2 rounded shadow-sm';
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = `${index + 1}. ${name}`;
+                        nameSpan.className = 'text-gray-700 break-all pr-2'; 
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = 'X';
+                        removeBtn.className = 'text-red-500 font-bold hover:text-red-700 px-2 flex-shrink-0'; 
+                        removeBtn.onclick = () => removeName(index);
+                        nameEl.appendChild(nameSpan);
+                        nameEl.appendChild(removeBtn);
+                        nameList.appendChild(nameEl);
+                    });
+                }
+                
+                function updateWinnerList() {
+                    nameWinnerList.innerHTML = ''; 
+                    if (winners.length === 0) {
+                        nameWinnerList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada pemenang...</p>';
+                        return;
+                    }
+                    winners.slice().reverse().forEach((winner, index) => {
+                        const winnerEl = document.createElement('div');
+                        winnerEl.className = 'bg-white p-2 rounded shadow-sm text-sm text-gray-800 break-words'; 
+                        winnerEl.textContent = `🏆 ${winner}`;
+                        nameWinnerList.appendChild(winnerEl);
+                    });
+                }
+
+                function handleAddName() {
+                    const name = nameInput.value.trim();
+                    if (name) {
+                        names.push(name);
+                        nameInput.value = ''; 
+                        drawWheel(); 
+                        updateNameList();
+                    }
+                }
+
+                function removeName(index) {
+                    names.splice(index, 1); 
+                    drawWheel(); 
+                    updateNameList();
+                }
+                
+                function handleReset() {
+                    if (isSpinning) return; 
+                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA nama peserta DAN riwayat pemenang?')) {
+                        names = []; 
+                        winners = []; 
+                        currentRotation = 0; 
+                        canvas.style.transform = 'rotate(0deg)'; 
+                        
+                        drawWheel(); 
+                        updateNameList(); 
+                        updateWinnerList(); 
+
+                        winnerDisplay.classList.add('hidden');
+                        winnerDisplay.classList.remove('animate-pop-in');
+                        winnerNameEl.classList.remove('text-shimmer');
+                    }
+                }
+
+                function handleSpin() {
+                    winnerDisplay.classList.add('hidden');
+                    winnerDisplay.classList.remove('animate-pop-in');
+                    winnerNameEl.classList.remove('text-shimmer');
+                    
+                    if (isSpinning || names.length < 2) {
+                        if (names.length < 2) {
+                            alert('Harap tambahkan minimal 2 nama untuk memutar!');
+                        }
+                        return;
+                    } 
+
+                    isSpinning = true;
+                    spinBtn.disabled = true;
+                    spinBtn.textContent = 'MEMUTAR...';
+
+                    const currentNames = [...names];
+                    const numSegments = currentNames.length;
+                    const arcSizeDeg = 360 / numSegments;
+
+                    const spinAmount = (Math.random() * 360) + (360 * 5);
+                    const targetRotation = currentRotation + spinAmount;
+
+                    const normalizedRotation = targetRotation % 360;
+                    currentRotation = targetRotation;
+                    
+                    canvas.style.transform = `rotate(${targetRotation}deg)`;
+                    
+                    setTimeout(() => {
+                        isSpinning = false;
+                        spinBtn.disabled = false;
+                        spinBtn.textContent = 'SPIN NAMA!';
+
+                        const finalAngle = normalizedRotation;
+                        const pointerAngle = 360 - finalAngle; 
+                        const winningIndex = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg);
+
+                        const winnerName = currentNames[winningIndex];
+
+                        if (winnerName !== undefined) {
+                            winnerNameEl.textContent = winnerName;
+                            winnerDisplay.classList.remove('hidden');
+                            winnerDisplay.classList.add('animate-pop-in');
+                            winnerNameEl.classList.add('text-shimmer');
+
+                            confetti({
+                                particleCount: 150,
+                                spread: 80,
+                                origin: { y: 0.6 },
+                                zIndex: 9999
+                            });
+                            
+                            winners.push(winnerName);
+                            updateWinnerList();
+                        }
+
+                    }, 8000); 
+                }
+
+                addNameBtn.addEventListener('click', handleAddName);
+                nameInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleAddName();
+                });
+                spinBtn.addEventListener('click', handleSpin);
+                resetBtn.addEventListener('click', handleReset);
+                
+                drawWheel(); 
+                updateNameList();
+                updateWinnerList();
+            }
+
+
+            // =============================================
+            // === LOGIKA UNTUK GACHA HADIAH (BAGIAN KANAN) ===
+            // =============================================
+            function setupGachaHadiah() {
+                const canvas = document.getElementById('prizeWheelCanvas');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const prizeInput = document.getElementById('prizeInput');
+                const addPrizeBtn = document.getElementById('addPrizeBtn');
+                const spinBtn = document.getElementById('spinPrizeBtn');
+                const prizeList = document.getElementById('prizeList');
+                const winnerDisplay = document.getElementById('prizeWinnerDisplay');
+                const winnerNameEl = document.getElementById('prizeWinnerName');
+                const resetBtn = document.getElementById('resetPrizeBtn');
+                const prizeWinnerList = document.getElementById('prizeWinnerList');
+
+                let prizes = [];
+                let prizeWinners = []; 
+                let currentRotation = 0; 
+                let isSpinning = false;
+
+                function drawPrizeWheel() {
+                    const numSegments = prizes.length;
+                    const arcSize = (2 * Math.PI) / numSegments;
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const radius = canvas.width / 2 - 10; 
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    
+                    let startAngle = -Math.PI / 2;
+
+                    const baseFontSize = 30; 
+                    const minFontSize = 12;  
+                    const maxFontSize = 28;  
+                    const fontSize = Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
+
+                    if (numSegments === 0) {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#f3f4f6'; 
+                        ctx.fill();
+                        ctx.strokeStyle = '#d1d5db'; 
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.fillStyle = '#6b7280'; 
+                        ctx.font = 'bold 40px Arial, sans-serif'; 
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('Tambahkan Hadiah', 0, 0);
+                        ctx.restore();
+                        return;
+                    }
+
+                    for (let i = 0; i < numSegments; i++) {
+                        const endAngle = startAngle + arcSize;
+                        ctx.beginPath();
+                        ctx.fillStyle = colors[i % colors.length];
+                        ctx.moveTo(0, 0);
+                        ctx.arc(0, 0, radius, startAngle, endAngle);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                        
+                        const textAngle = startAngle + arcSize / 2;
+                        ctx.save();
+                        ctx.fillStyle = '#111827';
+                        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                        
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.rotate(textAngle);
+
+                        let displayPrize = prizes[i];
+                        const maxTextWidth = radius * 0.8; 
+
+                        if (ctx.measureText(displayPrize).width > maxTextWidth) {
+                            while (displayPrize.length > 0 && ctx.measureText(displayPrize + "...").width > maxTextWidth) {
+                                displayPrize = displayPrize.substring(0, displayPrize.length - 1);
+                            }
+                            displayPrize += "...";
+                        }
+
+                        const centerRadius = (radius * 0.1) + (maxTextWidth / 2);
+                        
+                        ctx.fillText(displayPrize, centerRadius, 0);
+
+                        ctx.restore();
+                        startAngle = endAngle;
+                    }
+                    ctx.restore();
+                }
+
+                function updatePrizeList() {
+                    prizeList.innerHTML = ''; 
+                    if (prizes.length === 0) {
+                        prizeList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada hadiah...</p>';
+                        return;
+                    }
+                    prizes.forEach((prize, index) => {
+                        const prizeEl = document.createElement('div');
+                        prizeEl.className = 'flex justify-between items-center bg-white p-2 rounded shadow-sm';
+                        const prizeSpan = document.createElement('span');
+                        prizeSpan.textContent = `${index + 1}. ${prize}`;
+                        prizeSpan.className = 'text-gray-700 break-all pr-2'; 
+                        const removeBtn = document.createElement('button');
+                        removeBtn.textContent = 'X';
+                        removeBtn.className = 'text-red-500 font-bold hover:text-red-700 px-2 flex-shrink-0'; 
+                        removeBtn.onclick = () => removePrize(index);
+                        prizeEl.appendChild(prizeSpan);
+                        prizeEl.appendChild(removeBtn);
+                        prizeList.appendChild(prizeEl);
+                    });
+                }
+                
+                function updatePrizeWinnerList() {
+                    prizeWinnerList.innerHTML = ''; 
+                    if (prizeWinners.length === 0) {
+                        prizeWinnerList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada hadiah...</p>';
+                        return;
+                    }
+                    prizeWinners.slice().reverse().forEach((winner, index) => {
+                        const winnerEl = document.createElement('div');
+                        winnerEl.className = 'bg-white p-2 rounded shadow-sm text-sm text-gray-800 break-words'; 
+                        winnerEl.textContent = `🛍️ ${winner}`;
+                        prizeWinnerList.appendChild(winnerEl);
+                    });
+                }
+
+                function handleAddPrize() {
+                    const prize = prizeInput.value.trim();
+                    if (prize) {
+                        prizes.push(prize);
+                        prizeInput.value = ''; 
+                        drawPrizeWheel(); 
+                        updatePrizeList();
+                    }
+                }
+
+                function removePrize(index) {
+                    prizes.splice(index, 1); 
+                    drawPrizeWheel(); 
+                    updatePrizeList();
+                }
+
+                function handleResetPrize() {
+                    if (isSpinning) return; 
+                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA hadiah DAN riwayat hadiah?')) {
+                        prizes = []; 
+                        prizeWinners = []; 
+                        currentRotation = 0; 
+                        canvas.style.transform = 'rotate(0deg)'; 
+                        
+                        drawPrizeWheel(); 
+                        updatePrizeList(); 
+                        updatePrizeWinnerList(); 
+
+                        winnerDisplay.classList.add('hidden');
+                        winnerDisplay.classList.remove('animate-pop-in');
+                        winnerNameEl.classList.remove('text-shimmer');
+                    }
+                }
+
+
+                function handleSpinPrize() {
+                    winnerDisplay.classList.add('hidden');
+                    winnerDisplay.classList.remove('animate-pop-in');
+                    winnerNameEl.classList.remove('text-shimmer');
+
+                    if (isSpinning || prizes.length < 2) {
+                        if (prizes.length < 2) {
+                            alert('Harap tambahkan minimal 2 hadiah untuk memutar!');
+                        }
+                        return;
+                    } 
+
+                    isSpinning = true;
+                    spinBtn.disabled = true;
+                    spinBtn.textContent = 'MEMUTAR...';
+
+                    const currentPrizes = [...prizes];
+                    const numSegments = currentPrizes.length;
+                    const arcSizeDeg = 360 / numSegments;
+
+                    const spinAmount = (Math.random() * 360) + (360 * 5);
+                    const targetRotation = currentRotation + spinAmount;
+
+                    const normalizedRotation = targetRotation % 360;
+                    currentRotation = targetRotation;
+
+                    canvas.style.transform = `rotate(${targetRotation}deg)`;
+
+                    setTimeout(() => {
+                        isSpinning = false;
+                        spinBtn.disabled = false;
+                        spinBtn.textContent = 'SPIN HADIAH!';
+
+                        const finalAngle = normalizedRotation;
+                        const pointerAngle = 360 - finalAngle; 
+                        const winningIndex = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg);
+                        
+                        const winnerPrize = currentPrizes[winningIndex];
+
+                        if (winnerPrize !== undefined) {
+                            winnerNameEl.textContent = winnerPrize;
+                            winnerDisplay.classList.remove('hidden');
+                            winnerDisplay.classList.add('animate-pop-in');
+                            winnerNameEl.classList.add('text-shimmer');
+
+                            confetti({
+                                particleCount: 150,
+                                spread: 80,
+                                origin: { y: 0.6 },
+                                zIndex: 9999
+                            });
+
+                            prizeWinners.push(winnerPrize);
+                            updatePrizeWinnerList();
+                        }
+
+                    }, 8000); 
+                }
+
+                addPrizeBtn.addEventListener('click', handleAddPrize);
+                prizeInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleAddPrize();
+                });
+                spinBtn.addEventListener('click', handleSpinPrize);
+                resetBtn.addEventListener('click', handleResetPrize);
+                
+                drawPrizeWheel();
+                updatePrizeList();
+                updatePrizeWinnerList();
+            }
+
+            // --- INISIALISASI KEDUA GACHA ---
+            setupGachaNama();
+            setupGachaHadiah();
+
+        });
+    </script>
+</body>
+</html>
