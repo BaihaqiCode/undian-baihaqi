@@ -3,29 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baihaqi Spinning Wheel</title>
+    <title>Baihaqi Spinning Wheel</title> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     
     <style>
-        /* === [BLOK INI DIUBAH] === */
         /* CSS Kustom untuk Tanda Panah (Pointer) */
         .pointer {
             width: 0;
             height: 0;
-            /* Ukuran default (Mobile) */
             border-left: 20px solid transparent;
             border-right: 20px solid transparent;
             border-top: 40px solid #374151; 
             position: absolute;
-            top: -10px; /* Disesuaikan untuk mobile */
+            top: -10px; 
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
             filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
         }
 
-        /* Ukuran Desktop (sm: 640px dan ke atas) */
         @media (min-width: 640px) {
             .pointer {
                 border-left: 40px solid transparent;
@@ -34,8 +31,6 @@
                 top: -20px; 
             }
         }
-        /* === [AKHIR BLOK PERUBAHAN] === */
-
 
         /* Transisi Putaran Roda (8 detik) */
         #wheelCanvas, #prizeWheelCanvas {
@@ -245,14 +240,18 @@
                 const resetBtn = document.getElementById('resetNameBtn');
                 const nameWinnerList = document.getElementById('nameWinnerList');
                 
-                let names = [];
+                // [DIUBAH] Struktur data: array of objects
+                let names = []; 
                 let winners = []; 
                 let currentRotation = 0; 
                 let isSpinning = false;
 
                 function drawWheel() {
-                    const numSegments = names.length;
-                    const arcSize = (2 * Math.PI) / numSegments;
+                    // [DIUBAH] Filter item yang belum menang
+                    const eligibleNames = names.filter(item => !item.won);
+                    
+                    const numSegments = eligibleNames.length; // Hitung segmen dari yg eligible saja
+                    const arcSize = numSegments === 0 ? 2 * Math.PI : (2 * Math.PI) / numSegments; // Hindari pembagian dengan nol
                     const centerX = canvas.width / 2;
                     const centerY = canvas.height / 2;
                     const radius = canvas.width / 2 - 10; 
@@ -266,7 +265,8 @@
                     const baseFontSize = 30; 
                     const minFontSize = 12;  
                     const maxFontSize = 28;  
-                    const fontSize = Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
+                    // Sesuaikan font size berdasarkan jumlah segmen yg TAMPIL
+                    const fontSize = numSegments === 0 ? 28 : Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
 
                     if (numSegments === 0) {
                         ctx.beginPath();
@@ -280,12 +280,14 @@
                         ctx.font = 'bold 40px Arial, sans-serif'; 
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText('Tambahkan Nama', 0, 0);
+                        // [DIUBAH] Tampilkan pesan berbeda jika semua sudah menang
+                        ctx.fillText(names.length > 0 ? 'Semua Sudah Menang!' : 'Tambahkan Nama', 0, 0); 
                         ctx.restore();
                         return;
                     }
 
-                    for (let i = 0; i < numSegments; i++) {
+                    // [DIUBAH] Looping menggunakan eligibleNames
+                    for (let i = 0; i < numSegments; i++) { 
                         const endAngle = startAngle + arcSize;
                         ctx.beginPath();
                         ctx.fillStyle = colors[i % colors.length];
@@ -306,7 +308,8 @@
                         ctx.textBaseline = 'middle';
                         ctx.rotate(textAngle);
 
-                        let displayName = names[i];
+                        // [DIUBAH] Ambil teks dari eligibleNames
+                        let displayName = eligibleNames[i].text; 
                         const maxTextWidth = radius * 0.8; 
                         
                         if (ctx.measureText(displayName).width > maxTextWidth) {
@@ -332,16 +335,23 @@
                         nameList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada nama...</p>';
                         return;
                     }
-                    names.forEach((name, index) => {
+                    // Iterasi melalui semua nama (termasuk yg sudah menang)
+                    names.forEach((item, index) => { 
                         const nameEl = document.createElement('div');
                         nameEl.className = 'flex justify-between items-center bg-white p-2 rounded shadow-sm';
                         const nameSpan = document.createElement('span');
-                        nameSpan.textContent = `${index + 1}. ${name}`;
+                        nameSpan.textContent = `${index + 1}. ${item.text}`; // Tampilkan item.text
                         nameSpan.className = 'text-gray-700 break-all pr-2'; 
+                        
+                        // [DIUBAH] Tambahkan coretan jika item.won true
+                        if (item.won) {
+                            nameSpan.classList.add('line-through', 'text-gray-400');
+                        }
+
                         const removeBtn = document.createElement('button');
                         removeBtn.textContent = 'X';
                         removeBtn.className = 'text-red-500 font-bold hover:text-red-700 px-2 flex-shrink-0'; 
-                        removeBtn.onclick = () => removeName(index);
+                        removeBtn.onclick = () => removeName(index); // Hapus berdasarkan index asli
                         nameEl.appendChild(nameSpan);
                         nameEl.appendChild(removeBtn);
                         nameList.appendChild(nameEl);
@@ -357,15 +367,16 @@
                     winners.slice().reverse().forEach((winner, index) => {
                         const winnerEl = document.createElement('div');
                         winnerEl.className = 'bg-white p-2 rounded shadow-sm text-sm text-gray-800 break-words'; 
-                        winnerEl.textContent = `🏆 ${winner}`;
+                        winnerEl.textContent = `🏆 ${winner}`; // winner adalah string nama
                         nameWinnerList.appendChild(winnerEl);
                     });
                 }
 
                 function handleAddName() {
-                    const name = nameInput.value.trim();
-                    if (name) {
-                        names.push(name);
+                    const nameText = nameInput.value.trim();
+                    if (nameText) {
+                        // [DIUBAH] Push objek
+                        names.push({ text: nameText, won: false }); 
                         nameInput.value = ''; 
                         drawWheel(); 
                         updateNameList();
@@ -373,14 +384,14 @@
                 }
 
                 function removeName(index) {
-                    names.splice(index, 1); 
+                    names.splice(index, 1); // Hapus objek dari array
                     drawWheel(); 
                     updateNameList();
                 }
                 
                 function handleReset() {
                     if (isSpinning) return; 
-                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA nama peserta DAN riwayat pemenang?')) {
+                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA nama peserta DAN riwayat pemenang? Ini juga akan mereset status menang.')) {
                         names = []; 
                         winners = []; 
                         currentRotation = 0; 
@@ -400,10 +411,16 @@
                     winnerDisplay.classList.add('hidden');
                     winnerDisplay.classList.remove('animate-pop-in');
                     winnerNameEl.classList.remove('text-shimmer');
+
+                    // [DIUBAH] Filter nama yang bisa diputar
+                    const eligibleNames = names.filter(item => !item.won);
                     
-                    if (isSpinning || names.length < 2) {
-                        if (names.length < 2) {
-                            alert('Harap tambahkan minimal 2 nama untuk memutar!');
+                    // [DIUBAH] Cek jumlah eligibleNames
+                    if (isSpinning || eligibleNames.length < 2) {
+                        if (eligibleNames.length < 2 && names.length >= 2) {
+                            alert('Semua peserta sudah menang!');
+                        } else if (names.length < 2) {
+                             alert('Harap tambahkan minimal 2 nama untuk memutar!');
                         }
                         return;
                     } 
@@ -412,8 +429,8 @@
                     spinBtn.disabled = true;
                     spinBtn.textContent = 'MEMUTAR...';
 
-                    const currentNames = [...names];
-                    const numSegments = currentNames.length;
+                    // [DIUBAH] Logika spin berdasarkan eligibleNames
+                    const numSegments = eligibleNames.length;
                     const arcSizeDeg = 360 / numSegments;
 
                     const spinAmount = (Math.random() * 360) + (360 * 5);
@@ -431,12 +448,16 @@
 
                         const finalAngle = normalizedRotation;
                         const pointerAngle = 360 - finalAngle; 
-                        const winningIndex = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg);
+                        // [DIUBAH] Index pemenang dari eligibleNames
+                        const winnerIndexInEligible = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg); 
+                        
+                        // [DIUBAH] Dapatkan objek pemenang dari eligibleNames
+                        const winningItem = eligibleNames[winnerIndexInEligible]; 
 
-                        const winnerName = currentNames[winningIndex];
+                        if (winningItem) {
+                             const winnerText = winningItem.text; // Ambil teksnya saja
 
-                        if (winnerName !== undefined) {
-                            winnerNameEl.textContent = winnerName;
+                            winnerNameEl.textContent = winnerText;
                             winnerDisplay.classList.remove('hidden');
                             winnerDisplay.classList.add('animate-pop-in');
                             winnerNameEl.classList.add('text-shimmer');
@@ -448,9 +469,23 @@
                                 zIndex: 9999
                             });
                             
-                            winners.push(winnerName);
+                            // [DIUBAH] Cari objek asli di array 'names' dan set won = true
+                            const originalItem = names.find(item => item.text === winnerText && !item.won);
+                            if (originalItem) {
+                                originalItem.won = true;
+                            }
+                            
+                            winners.push(winnerText); // Tambahkan teks ke riwayat
                             updateWinnerList();
+                            updateNameList(); // Update daftar untuk menampilkan coretan
+                            drawWheel();      // Gambar ulang roda tanpa pemenang
+
+                        } else {
+                            console.error("Tidak bisa menentukan pemenang, item tidak ditemukan.");
+                            // Mungkin terjadi jika array eligibleNames kosong setelah timeout
+                            drawWheel(); // Gambar ulang roda
                         }
+
 
                     }, 8000); 
                 }
@@ -471,7 +506,7 @@
             // =============================================
             // === LOGIKA UNTUK GACHA HADIAH (BAGIAN KANAN) ===
             // =============================================
-            function setupGachaHadiah() {
+             function setupGachaHadiah() {
                 const canvas = document.getElementById('prizeWheelCanvas');
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
@@ -484,14 +519,18 @@
                 const resetBtn = document.getElementById('resetPrizeBtn');
                 const prizeWinnerList = document.getElementById('prizeWinnerList');
 
-                let prizes = [];
+                // [DIUBAH] Struktur data: array of objects
+                let prizes = []; 
                 let prizeWinners = []; 
                 let currentRotation = 0; 
                 let isSpinning = false;
 
                 function drawPrizeWheel() {
-                    const numSegments = prizes.length;
-                    const arcSize = (2 * Math.PI) / numSegments;
+                    // [DIUBAH] Filter item yang belum menang
+                    const eligiblePrizes = prizes.filter(item => !item.won);
+
+                    const numSegments = eligiblePrizes.length;
+                    const arcSize = numSegments === 0 ? 2 * Math.PI : (2 * Math.PI) / numSegments;
                     const centerX = canvas.width / 2;
                     const centerY = canvas.height / 2;
                     const radius = canvas.width / 2 - 10; 
@@ -505,7 +544,7 @@
                     const baseFontSize = 30; 
                     const minFontSize = 12;  
                     const maxFontSize = 28;  
-                    const fontSize = Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
+                    const fontSize = numSegments === 0 ? 28 : Math.max(minFontSize, Math.min(maxFontSize, baseFontSize - (numSegments * 0.5)));
 
                     if (numSegments === 0) {
                         ctx.beginPath();
@@ -519,11 +558,13 @@
                         ctx.font = 'bold 40px Arial, sans-serif'; 
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText('Tambahkan Hadiah', 0, 0);
+                        // [DIUBAH] Tampilkan pesan berbeda jika semua sudah menang
+                        ctx.fillText(prizes.length > 0 ? 'Semua Sudah Menang!' : 'Tambahkan Hadiah', 0, 0); 
                         ctx.restore();
                         return;
                     }
 
+                    // [DIUBAH] Looping menggunakan eligiblePrizes
                     for (let i = 0; i < numSegments; i++) {
                         const endAngle = startAngle + arcSize;
                         ctx.beginPath();
@@ -545,7 +586,8 @@
                         ctx.textBaseline = 'middle';
                         ctx.rotate(textAngle);
 
-                        let displayPrize = prizes[i];
+                        // [DIUBAH] Ambil teks dari eligiblePrizes
+                        let displayPrize = eligiblePrizes[i].text; 
                         const maxTextWidth = radius * 0.8; 
 
                         if (ctx.measureText(displayPrize).width > maxTextWidth) {
@@ -571,16 +613,23 @@
                         prizeList.innerHTML = '<p class="text-gray-400 text-center italic">Belum ada hadiah...</p>';
                         return;
                     }
-                    prizes.forEach((prize, index) => {
+                     // Iterasi melalui semua hadiah (termasuk yg sudah menang)
+                    prizes.forEach((item, index) => {
                         const prizeEl = document.createElement('div');
                         prizeEl.className = 'flex justify-between items-center bg-white p-2 rounded shadow-sm';
                         const prizeSpan = document.createElement('span');
-                        prizeSpan.textContent = `${index + 1}. ${prize}`;
+                        prizeSpan.textContent = `${index + 1}. ${item.text}`; // Tampilkan item.text
                         prizeSpan.className = 'text-gray-700 break-all pr-2'; 
+                        
+                        // [DIUBAH] Tambahkan coretan jika item.won true
+                        if (item.won) {
+                            prizeSpan.classList.add('line-through', 'text-gray-400');
+                        }
+
                         const removeBtn = document.createElement('button');
                         removeBtn.textContent = 'X';
                         removeBtn.className = 'text-red-500 font-bold hover:text-red-700 px-2 flex-shrink-0'; 
-                        removeBtn.onclick = () => removePrize(index);
+                        removeBtn.onclick = () => removePrize(index); // Hapus berdasarkan index asli
                         prizeEl.appendChild(prizeSpan);
                         prizeEl.appendChild(removeBtn);
                         prizeList.appendChild(prizeEl);
@@ -596,15 +645,16 @@
                     prizeWinners.slice().reverse().forEach((winner, index) => {
                         const winnerEl = document.createElement('div');
                         winnerEl.className = 'bg-white p-2 rounded shadow-sm text-sm text-gray-800 break-words'; 
-                        winnerEl.textContent = `🛍️ ${winner}`;
+                        winnerEl.textContent = `🛍️ ${winner}`; // winner adalah string nama
                         prizeWinnerList.appendChild(winnerEl);
                     });
                 }
 
                 function handleAddPrize() {
-                    const prize = prizeInput.value.trim();
-                    if (prize) {
-                        prizes.push(prize);
+                    const prizeText = prizeInput.value.trim();
+                    if (prizeText) {
+                         // [DIUBAH] Push objek
+                        prizes.push({ text: prizeText, won: false });
                         prizeInput.value = ''; 
                         drawPrizeWheel(); 
                         updatePrizeList();
@@ -612,14 +662,14 @@
                 }
 
                 function removePrize(index) {
-                    prizes.splice(index, 1); 
+                    prizes.splice(index, 1); // Hapus objek dari array
                     drawPrizeWheel(); 
                     updatePrizeList();
                 }
 
                 function handleResetPrize() {
                     if (isSpinning) return; 
-                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA hadiah DAN riwayat hadiah?')) {
+                    if (confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA hadiah DAN riwayat hadiah? Ini juga akan mereset status menang.')) {
                         prizes = []; 
                         prizeWinners = []; 
                         currentRotation = 0; 
@@ -641,8 +691,14 @@
                     winnerDisplay.classList.remove('animate-pop-in');
                     winnerNameEl.classList.remove('text-shimmer');
 
-                    if (isSpinning || prizes.length < 2) {
-                        if (prizes.length < 2) {
+                    // [DIUBAH] Filter hadiah yang bisa diputar
+                    const eligiblePrizes = prizes.filter(item => !item.won);
+
+                    // [DIUBAH] Cek jumlah eligiblePrizes
+                    if (isSpinning || eligiblePrizes.length < 2) {
+                         if (eligiblePrizes.length < 2 && prizes.length >= 2) {
+                            alert('Semua hadiah sudah dimenangkan!');
+                        } else if (prizes.length < 2) {
                             alert('Harap tambahkan minimal 2 hadiah untuk memutar!');
                         }
                         return;
@@ -652,8 +708,8 @@
                     spinBtn.disabled = true;
                     spinBtn.textContent = 'MEMUTAR...';
 
-                    const currentPrizes = [...prizes];
-                    const numSegments = currentPrizes.length;
+                    // [DIUBAH] Logika spin berdasarkan eligiblePrizes
+                    const numSegments = eligiblePrizes.length;
                     const arcSizeDeg = 360 / numSegments;
 
                     const spinAmount = (Math.random() * 360) + (360 * 5);
@@ -671,12 +727,16 @@
 
                         const finalAngle = normalizedRotation;
                         const pointerAngle = 360 - finalAngle; 
-                        const winningIndex = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg);
+                        // [DIUBAH] Index pemenang dari eligiblePrizes
+                        const winnerIndexInEligible = Math.floor((pointerAngle + 360) % 360 / arcSizeDeg);
                         
-                        const winnerPrize = currentPrizes[winningIndex];
+                        // [DIUBAH] Dapatkan objek pemenang dari eligiblePrizes
+                        const winningItem = eligiblePrizes[winnerIndexInEligible];
 
-                        if (winnerPrize !== undefined) {
-                            winnerNameEl.textContent = winnerPrize;
+                        if (winningItem) {
+                            const winnerText = winningItem.text;
+
+                            winnerNameEl.textContent = winnerText;
                             winnerDisplay.classList.remove('hidden');
                             winnerDisplay.classList.add('animate-pop-in');
                             winnerNameEl.classList.add('text-shimmer');
@@ -688,9 +748,21 @@
                                 zIndex: 9999
                             });
 
-                            prizeWinners.push(winnerPrize);
+                             // [DIUBAH] Cari objek asli di array 'prizes' dan set won = true
+                            const originalItem = prizes.find(item => item.text === winnerText && !item.won);
+                            if (originalItem) {
+                                originalItem.won = true;
+                            }
+
+                            prizeWinners.push(winnerText); // Tambahkan teks ke riwayat
                             updatePrizeWinnerList();
-                        }
+                            updatePrizeList(); // Update daftar untuk menampilkan coretan
+                            drawPrizeWheel();  // Gambar ulang roda tanpa pemenang
+
+                         } else {
+                            console.error("Tidak bisa menentukan pemenang hadiah, item tidak ditemukan.");
+                            drawPrizeWheel(); // Gambar ulang roda
+                         }
 
                     }, 8000); 
                 }
